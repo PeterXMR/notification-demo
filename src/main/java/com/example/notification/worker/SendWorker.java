@@ -9,7 +9,9 @@ import com.example.notification.service.RecipientStateService;
 import com.example.notification.service.RecipientStateService.ClaimedRecipient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -57,6 +59,16 @@ public class SendWorker {
                 recorded = stateService.markFailed(recipient.id(), recipient.attempts(), e.getMessage());
             } catch (TransientMailException e) {
                 recorded = handleTransient(recipient, e.getMessage());
+            } catch (DataAccessException | TransactionException e) {
+                // DB infrastructure failure while recording the result — possibly AFTER a
+                // successful provider send. This must not be treated as a mail failure:
+                // handleTransient would burn the retry budget, and at max attempts would mark
+                // a delivered recipient FAILED. Record nothing (the DB is down anyway) and
+                // walk away: the poller's stuck-SENDING recovery returns the row to PENDING
+                // once the DB is back, and the idempotency key makes the re-send safe.
+                log.error("Database unavailable while recording result for {}; leaving claim to stuck-SENDING recovery",
+                        recipient.email(), e);
+                return;
             } catch (RuntimeException e) {
                 // unexpected error: safest to treat as transient — bounded by max attempts anyway
                 recorded = handleTransient(recipient, "unexpected: " + e.getMessage());
