@@ -92,6 +92,7 @@ Odpoveď `202 Accepted` — okamžite, bez čakania na odoslanie:
 |---|---|
 | `400` | prázdny predmet/text, predmet nad 255 znakov, prázdny zoznam, neplatný formát e-mailu, e-mail nad 320 znakov, viac než 100 príjemcov |
 | `422` | príjemca neexistuje alebo nie je aktívny — kampaň sa odmietne **celá**, odpoveď vymenuje zoznamy `unknown` / `inactive` |
+| `503` | databáza je nedostupná (platí pre všetky endpointy) — stabilné telo `{"error": "SERVICE_UNAVAILABLE", …}`, klient má požiadavku zopakovať neskôr |
 
 Duplicitné adresy sa ticho deduplikujú (case-insensitive); `total` = počet unikátnych
 príjemcov a fyzicky sa odošle práve jeden e-mail.

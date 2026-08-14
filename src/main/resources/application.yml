@@ -5,6 +5,8 @@ spring:
     url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:demo}
     username: ${DB_USER:demo}
     password: ${DB_PASSWORD:demo}
+    hikari:
+      connection-timeout: 3000 # fail fast during a DB outage: the 503 should arrive in seconds, not after the 30s default
   jpa:
     hibernate:
       ddl-auto: none # schema is owned by Flyway migrations

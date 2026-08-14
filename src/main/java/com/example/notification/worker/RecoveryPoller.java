@@ -51,8 +51,15 @@ public class RecoveryPoller {
     @Scheduled(fixedDelayString = "${notification.poller.interval-ms}")
     public void poll() {
         Instant now = Instant.now();
+        Instant stuckBefore = now.minusMillis(properties.poller().stuckTimeoutMs());
 
-        int reset = stateService.resetStuckSending(now.minusMillis(properties.poller().stuckTimeoutMs()));
+        int failed = stateService.failStuckExhausted(stuckBefore, properties.retry().maxAttempts());
+        if (failed > 0) {
+            log.warn("Terminally failed {} recipient(s): retry budget exhausted without a recorded result", failed);
+        }
+
+        int reset = stateService.resetStuckSending(stuckBefore,
+                now.plusMillis(properties.retry().backoffMs()), properties.retry().maxAttempts());
         if (reset > 0) {
             log.warn("Recovered {} recipient(s) stuck in SENDING", reset);
         }

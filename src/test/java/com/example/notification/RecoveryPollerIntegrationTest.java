@@ -71,6 +71,27 @@ class RecoveryPollerIntegrationTest extends IntegrationTestBase {
         });
     }
 
+    @Test
+    void pollerTerminallyFailsStuckRecipientWithExhaustedBudget() {
+        UUID campaignId = insertCampaignWithPendingRecipient("alice@example.com");
+        CampaignRecipient recipient = recipientRepository
+                .findByCampaignIdAndEmail(campaignId, "alice@example.com").orElseThrow();
+
+        // budget already spent across claim episodes that never recorded a result
+        // (repeated crashes or DB failures mid-episode) — must end FAILED, not loop forever
+        jdbc.update("""
+                UPDATE campaign_recipient
+                SET status = 'SENDING', attempts = 5, updated_at = now() - INTERVAL '1 hour'
+                WHERE id = ?
+                """, recipient.getId());
+
+        await().atMost(TIMEOUT).untilAsserted(() -> {
+            CampaignRecipient failed = recipientRepository.findById(recipient.getId()).orElseThrow();
+            assertThat(failed.getStatus()).isEqualTo(RecipientStatus.FAILED);
+            assertThat(failed.getLastError()).contains("retries exhausted");
+        });
+    }
+
     private UUID insertCampaignWithPendingRecipient(String email) {
         User user = userRepository.findByEmailIn(List.of(email)).getFirst();
         Campaign campaign = campaignRepository.save(new Campaign("Recovery subject", "Recovery message"));

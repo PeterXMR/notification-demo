@@ -9,7 +9,9 @@ import com.example.notification.service.RecipientStateService;
 import com.example.notification.service.RecipientStateService.ClaimedRecipient;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -38,35 +40,52 @@ public class SendWorker {
     }
 
     public void process(UUID recipientId) {
-        stateService.claim(recipientId).ifPresent(recipient -> {
-            boolean recorded;
-            try {
-                // the recipient row id IS the idempotency key: stable across every retry,
-                // restart and re-claim, so the provider can refuse a second delivery
-                mailSender.send(recipient.id(), recipient.email(), recipient.subject(), recipient.message());
-                recorded = stateService.markSent(recipient.id(), recipient.attempts());
-            } catch (MailProviderUnavailableException e) {
-                // circuit open: provider-wide outage, not this recipient's fault —
-                // release the claim with the retry budget restored
-                log.info("Provider unavailable, releasing {} without burning an attempt", recipient.email());
-                recorded = stateService.release(recipient.id(), recipient.attempts(),
-                        Instant.now().plusMillis(properties.retry().backoffMs()), e.getMessage());
-            } catch (PermanentMailException e) {
-                // permanent rejection: terminal immediately, attempts are irrelevant
-                log.warn("Recipient {} permanently rejected: {}", recipient.email(), e.getMessage());
-                recorded = stateService.markFailed(recipient.id(), recipient.attempts(), e.getMessage());
-            } catch (TransientMailException e) {
-                recorded = handleTransient(recipient, e.getMessage());
-            } catch (RuntimeException e) {
-                // unexpected error: safest to treat as transient — bounded by max attempts anyway
-                recorded = handleTransient(recipient, "unexpected: " + e.getMessage());
-            }
-            if (!recorded) {
-                // fence mismatch: this claim was reset by the poller and re-claimed by
-                // another worker — our result is stale and correctly discarded
-                log.warn("Lost claim ownership of {} (stale worker), result discarded", recipient.email());
-            }
-        });
+        try {
+            stateService.claim(recipientId).ifPresent(this::sendAndRecordResult);
+        } catch (DataAccessException | TransactionException e) {
+            // DB infrastructure failure while claiming or while RECORDING a result —
+            // possibly AFTER a successful provider send. This must not be treated as a
+            // mail failure: handleTransient would mark a possibly-delivered recipient
+            // FAILED at max attempts. Record nothing (the DB is down anyway) and walk
+            // away: the poller's stuck-SENDING recovery re-circulates the row with a
+            // backoff once the DB is back, the idempotency key makes the re-send safe,
+            // and the recovery path enforces the same max-attempts bound terminally.
+            // Note the claim's attempt stays spent — bounded, like crash recovery.
+            log.error("Database unavailable while processing recipient {}; leaving any claim to stuck-SENDING recovery",
+                    recipientId, e);
+        }
+    }
+
+    private void sendAndRecordResult(ClaimedRecipient recipient) {
+        boolean recorded;
+        try {
+            // the recipient row id IS the idempotency key: stable across every retry,
+            // restart and re-claim, so the provider can refuse a second delivery
+            mailSender.send(recipient.id(), recipient.email(), recipient.subject(), recipient.message());
+            recorded = stateService.markSent(recipient.id(), recipient.attempts());
+        } catch (MailProviderUnavailableException e) {
+            // circuit open: provider-wide outage, not this recipient's fault —
+            // release the claim with the retry budget restored
+            log.info("Provider unavailable, releasing {} without burning an attempt", recipient.email());
+            recorded = stateService.release(recipient.id(), recipient.attempts(),
+                    Instant.now().plusMillis(properties.retry().backoffMs()), e.getMessage());
+        } catch (PermanentMailException e) {
+            // permanent rejection: terminal immediately, attempts are irrelevant
+            log.warn("Recipient {} permanently rejected: {}", recipient.email(), e.getMessage());
+            recorded = stateService.markFailed(recipient.id(), recipient.attempts(), e.getMessage());
+        } catch (TransientMailException e) {
+            recorded = handleTransient(recipient, e.getMessage());
+        } catch (DataAccessException | TransactionException e) {
+            throw e; // infrastructure, not a mail failure — handled once in process()
+        } catch (RuntimeException e) {
+            // unexpected error: safest to treat as transient — bounded by max attempts anyway
+            recorded = handleTransient(recipient, "unexpected: " + e.getMessage());
+        }
+        if (!recorded) {
+            // fence mismatch: this claim was reset by the poller and re-claimed by
+            // another worker — our result is stale and correctly discarded
+            log.warn("Lost claim ownership of {} (stale worker), result discarded", recipient.email());
+        }
     }
 
     private boolean handleTransient(ClaimedRecipient recipient, String error) {
