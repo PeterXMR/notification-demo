@@ -1,0 +1,63 @@
+spring:
+  application:
+    name: notification-service
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:demo}
+    username: ${DB_USER:demo}
+    password: ${DB_PASSWORD:demo}
+  jpa:
+    hibernate:
+      ddl-auto: none # schema is owned by Flyway migrations
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100 # campaign create inserts up to 100 recipients in one TX
+        order_inserts: true
+
+server:
+  port: 8080
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,circuitbreakers
+  endpoint:
+    health:
+      show-details: always
+
+# Circuit breaker around the mail provider: distinguishes "this address fails"
+# (per-recipient retry budget) from "the provider is down" (stop burning budgets).
+# Half-open lets exactly 1 probe email through; success closes the circuit again.
+resilience4j:
+  circuitbreaker:
+    instances:
+      mailProvider:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 10
+        minimum-number-of-calls: 5
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 30s
+        permitted-number-of-calls-in-half-open-state: 1
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          # Both are ADDRESS problems, not provider problems — letting either trip the
+          # breaker would refund the attempt every time and the address would retry forever.
+          - com.example.notification.exception.PermanentMailException         # hard bounce (5xx)
+          - com.example.notification.exception.AddressTransientMailException  # per-mailbox 4xx (451/452)
+
+notification:
+  simulator:
+    latency-ms: 800              # simulated provider latency per email
+    slow-latency-ms: 5000        # latency for slow@... addresses (long PROCESSING window for demos)
+    transient-failures-before-success: 2  # temp-fail@... fails this many times, then succeeds
+  worker:
+    concurrency: 2               # small pool -> progress is observable via the status API
+  retry:
+    max-attempts: 5              # total attempts per recipient (1 initial + 4 retries)
+    backoff-ms: 30000            # base for exponential backoff: 30s, 1m, 2m, 4m -> ~15 min window
+  poller:
+    interval-ms: 2000            # recovery poller period
+    stuck-timeout-ms: 120000     # SENDING older than this is considered orphaned (crash mid-send)
+    batch-size: 100

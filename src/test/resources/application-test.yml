@@ -1,0 +1,33 @@
+# Fast timings so integration tests exercise the real retry/backoff/poller machinery
+# without slowing the suite down.
+notification:
+  simulator:
+    latency-ms: 20
+    slow-latency-ms: 300
+    transient-failures-before-success: 2
+  worker:
+    concurrency: 4
+  retry:
+    max-attempts: 5
+    backoff-ms: 100
+  poller:
+    interval-ms: 250
+    stuck-timeout-ms: 1000
+    batch-size: 200
+
+# Breaker tuned for tests: opens fast during a simulated outage. Per-address failures
+# (temp-fail@, always-fail@) are excluded by type, not by threshold tuning.
+resilience4j:
+  circuitbreaker:
+    instances:
+      mailProvider:
+        sliding-window-type: COUNT_BASED
+        sliding-window-size: 4
+        minimum-number-of-calls: 4
+        failure-rate-threshold: 100
+        wait-duration-in-open-state: 500ms
+        permitted-number-of-calls-in-half-open-state: 1
+        automatic-transition-from-open-to-half-open-enabled: true
+        ignore-exceptions:
+          - com.example.notification.exception.PermanentMailException
+          - com.example.notification.exception.AddressTransientMailException

@@ -1,0 +1,23 @@
+# Demo profile: every Postman scenario finishes in seconds instead of minutes.
+#
+#   ./gradlew bootRun --args='--spring.profiles.active=demo'
+#   (or SPRING_PROFILES_ACTIVE=demo with docker compose)
+#
+# Only timings change — retry counts, limits and all behaviour stay identical to the
+# production-like defaults in application.yml, so the demo demonstrates the same logic,
+# just faster: temp-fail@ completes in ~7 s, always-fail@ exhausts its 5 attempts in ~30 s.
+notification:
+  simulator:
+    latency-ms: 300              # base provider latency per email
+    slow-latency-ms: 5000        # slow@ still keeps the campaign visibly PROCESSING
+    transient-failures-before-success: 2
+  retry:
+    backoff-ms: 2000             # exponential: 2s, 4s, 8s, 16s
+  poller:
+    interval-ms: 1000
+
+resilience4j:
+  circuitbreaker:
+    instances:
+      mailProvider:
+        wait-duration-in-open-state: 5s   # a demoed outage recovers quickly

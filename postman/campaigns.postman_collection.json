@@ -1,0 +1,922 @@
+{
+  "info": {
+    "name": "Notification campaigns",
+    "description": "Async bulk email campaigns demo, organised by acceptance criterion. Run the app with the demo profile for snappy timings: ./gradlew bootRun --args='--spring.profiles.active=demo'. Folders: 1) the happy path with all simulator behaviours, 2) each simulator behaviour isolated (success / temporary error with retry / permanent rejection / bounded retries), 3) validation and consistency rules, 4) the exactly-once verification via the deliveries endpoint.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "campaignId",
+      "value": ""
+    },
+    {
+      "key": "retryCampaignId",
+      "value": ""
+    },
+    {
+      "key": "bounceCampaignId",
+      "value": ""
+    },
+    {
+      "key": "boundedCampaignId",
+      "value": ""
+    },
+    {
+      "key": "dedupCampaignId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1 · Bulk campaign (all simulator behaviours)",
+      "item": [
+        {
+          "name": "Create campaign for 95 active users",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('campaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('returns campaignId', () => pm.expect(body.campaignId).to.be.a('string'));",
+                  "pm.test('status is PROCESSING', () => pm.expect(body.status).to.eql('PROCESSING'));",
+                  "pm.test('responds without waiting for emails', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Planned maintenance\",\n  \"message\": \"The service will be temporarily unavailable.\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"jane@example.com\",\n    \"alice@example.com\",\n    \"bob@example.com\",\n    \"carol@example.com\",\n    \"temp-fail@example.com\",\n    \"bounce@example.com\",\n    \"slow@example.com\",\n    \"user10@example.com\",\n    \"user11@example.com\",\n    \"user12@example.com\",\n    \"user13@example.com\",\n    \"user14@example.com\",\n    \"user15@example.com\",\n    \"user16@example.com\",\n    \"user17@example.com\",\n    \"user18@example.com\",\n    \"user19@example.com\",\n    \"user20@example.com\",\n    \"user21@example.com\",\n    \"user22@example.com\",\n    \"user23@example.com\",\n    \"user24@example.com\",\n    \"user25@example.com\",\n    \"user26@example.com\",\n    \"user27@example.com\",\n    \"user28@example.com\",\n    \"user29@example.com\",\n    \"user30@example.com\",\n    \"user31@example.com\",\n    \"user32@example.com\",\n    \"user33@example.com\",\n    \"user34@example.com\",\n    \"user35@example.com\",\n    \"user36@example.com\",\n    \"user37@example.com\",\n    \"user38@example.com\",\n    \"user39@example.com\",\n    \"user40@example.com\",\n    \"user41@example.com\",\n    \"user42@example.com\",\n    \"user43@example.com\",\n    \"user44@example.com\",\n    \"user45@example.com\",\n    \"user46@example.com\",\n    \"user47@example.com\",\n    \"user48@example.com\",\n    \"user49@example.com\",\n    \"user50@example.com\",\n    \"user51@example.com\",\n    \"user52@example.com\",\n    \"user53@example.com\",\n    \"user54@example.com\",\n    \"user55@example.com\",\n    \"user56@example.com\",\n    \"user57@example.com\",\n    \"user58@example.com\",\n    \"user59@example.com\",\n    \"user60@example.com\",\n    \"user61@example.com\",\n    \"user62@example.com\",\n    \"user63@example.com\",\n    \"user64@example.com\",\n    \"user65@example.com\",\n    \"user66@example.com\",\n    \"user67@example.com\",\n    \"user68@example.com\",\n    \"user69@example.com\",\n    \"user70@example.com\",\n    \"user71@example.com\",\n    \"user72@example.com\",\n    \"user73@example.com\",\n    \"user74@example.com\",\n    \"user75@example.com\",\n    \"user76@example.com\",\n    \"user77@example.com\",\n    \"user78@example.com\",\n    \"user79@example.com\",\n    \"user80@example.com\",\n    \"user81@example.com\",\n    \"user82@example.com\",\n    \"user83@example.com\",\n    \"user84@example.com\",\n    \"user85@example.com\",\n    \"user86@example.com\",\n    \"user87@example.com\",\n    \"user88@example.com\",\n    \"user89@example.com\",\n    \"user90@example.com\",\n    \"user91@example.com\",\n    \"user92@example.com\",\n    \"user93@example.com\",\n    \"user94@example.com\",\n    \"user95@example.com\",\n    \"user96@example.com\"\n  ]\n}"
+            },
+            "description": "All 95 active seed users, including temp-fail@ (temporary error, retried), bounce@ (permanent rejection) and slow@ (long PROCESSING window). One run demonstrates every simulator behaviour."
+          }
+        },
+        {
+          "name": "Get campaign status (poll until COMPLETED)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "console.log(`${b.status}: sent=${b.sent} failed=${b.failed} remaining=${b.remaining} (total=${b.total})`);",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('counts are consistent', () => pm.expect(b.sent + b.failed + b.remaining).to.eql(b.total));",
+                  "pm.test('status matches remaining', () => pm.expect(b.status).to.eql(b.remaining > 0 ? 'PROCESSING' : 'COMPLETED'));",
+                  "if (b.status === 'PROCESSING' && typeof pm.execution !== 'undefined' && pm.execution.setNextRequest) {",
+                  "    pm.execution.setNextRequest('Get campaign status (poll until COMPLETED)');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{campaignId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{campaignId}}"
+              ]
+            },
+            "description": "Repeat manually (or let the Collection Runner loop) to watch PROCESSING -> COMPLETED with growing counts. Expected end state: failed=1 (bounce@), everyone else sent."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Simulator behaviours, one per campaign",
+      "item": [
+        {
+          "name": "Successful send",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('campaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('returns campaignId', () => pm.expect(body.campaignId).to.be.a('string'));",
+                  "pm.test('status is PROCESSING', () => pm.expect(body.status).to.eql('PROCESSING'));",
+                  "pm.test('responds without waiting for emails', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Success scenario\",\n  \"message\": \"Plain successful delivery.\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"jane@example.com\"\n  ]\n}"
+            },
+            "description": "Only well-behaved addresses: completes with sent=2, failed=0 within seconds."
+          }
+        },
+        {
+          "name": "Successful send -> status COMPLETED",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "if (b.status === 'COMPLETED') {",
+                  "    pm.test('all sent, none failed', () => { pm.expect(b.sent).to.eql(2); pm.expect(b.failed).to.eql(0); });",
+                  "} else {",
+                  "    console.log('still PROCESSING — send again in a moment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{campaignId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{campaignId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Temporary error -> retried until success",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('retryCampaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('returns campaignId', () => pm.expect(body.campaignId).to.be.a('string'));",
+                  "pm.test('status is PROCESSING', () => pm.expect(body.status).to.eql('PROCESSING'));",
+                  "pm.test('responds without waiting for emails', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Retry scenario\",\n  \"message\": \"temp-fail@ fails twice with 451, succeeds on the 3rd attempt.\",\n  \"recipients\": [\n    \"temp-fail@example.com\"\n  ]\n}"
+            },
+            "description": "With the demo profile the two backoffs are 2 s and 4 s, so the campaign completes in ~7 s. The deliveries endpoint then shows providerCalls=3, delivered=1."
+          }
+        },
+        {
+          "name": "Temporary error -> eventually sent, 3 provider calls",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const r = b.recipients.find(x => x.email === 'temp-fail@example.com');",
+                  "if (r.status === 'SENT') {",
+                  "    pm.test('retried: 3 provider calls', () => pm.expect(r.providerCalls).to.eql(3));",
+                  "    pm.test('delivered exactly once despite retries', () => pm.expect(r.delivered).to.eql(1));",
+                  "} else {",
+                  "    console.log(`still ${r.status} after ${r.providerCalls} call(s) — retry backoff in progress, send again`);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{retryCampaignId}}/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{retryCampaignId}}",
+                "deliveries"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Permanent rejection -> FAILED without retries",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('bounceCampaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('returns campaignId', () => pm.expect(body.campaignId).to.be.a('string'));",
+                  "pm.test('status is PROCESSING', () => pm.expect(body.status).to.eql('PROCESSING'));",
+                  "pm.test('responds without waiting for emails', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Bounce scenario\",\n  \"message\": \"bounce@ is rejected with 550 and must not be retried.\",\n  \"recipients\": [\n    \"bounce@example.com\",\n    \"john@example.com\"\n  ]\n}"
+            },
+            "description": "Permanent rejection is terminal after ONE attempt and does not stop the other recipient."
+          }
+        },
+        {
+          "name": "Permanent rejection -> failed=1, exactly 1 attempt",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const bounce = b.recipients.find(x => x.email === 'bounce@example.com');",
+                  "const john = b.recipients.find(x => x.email === 'john@example.com');",
+                  "if (bounce.status === 'FAILED' && john.status === 'SENT') {",
+                  "    pm.test('no endless retrying: exactly 1 provider call', () => pm.expect(bounce.providerCalls).to.eql(1));",
+                  "    pm.test('never delivered', () => pm.expect(bounce.delivered).to.eql(0));",
+                  "    pm.test('failure did not stop the other recipient', () => pm.expect(john.delivered).to.eql(1));",
+                  "} else {",
+                  "    console.log('still processing — send again in a moment');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{bounceCampaignId}}/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{bounceCampaignId}}",
+                "deliveries"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bounded retries -> FAILED after max attempts",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('boundedCampaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));",
+                  "pm.test('returns campaignId', () => pm.expect(body.campaignId).to.be.a('string'));",
+                  "pm.test('status is PROCESSING', () => pm.expect(body.status).to.eql('PROCESSING'));",
+                  "pm.test('responds without waiting for emails', () => pm.expect(pm.response.responseTime).to.be.below(2000));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Retry-bound scenario\",\n  \"message\": \"always-fail@ answers 451 on every attempt; only the retry budget stops it.\",\n  \"recipients\": [\n    \"always-fail@example.com\"\n  ]\n}"
+            },
+            "description": "Demonstrates the LIMIT on retries: 5 attempts (demo profile backoffs 2/4/8/16 s, ~30 s total), then FAILED with 'retries exhausted'. No infinite loop."
+          }
+        },
+        {
+          "name": "Bounded retries -> exactly max-attempts provider calls",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "const r = b.recipients.find(x => x.email === 'always-fail@example.com');",
+                  "if (r.status === 'FAILED') {",
+                  "    pm.test('retries stopped at the limit (5 attempts)', () => pm.expect(r.providerCalls).to.eql(5));",
+                  "    pm.test('never delivered', () => pm.expect(r.delivered).to.eql(0));",
+                  "} else {",
+                  "    console.log(`attempt ${r.providerCalls}/5 — retries still running, send again`);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{boundedCampaignId}}/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{boundedCampaignId}}",
+                "deliveries"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Validation and consistency",
+      "item": [
+        {
+          "name": "Invalid email format -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('reports VALIDATION_ERROR', () => pm.expect(pm.response.json().error).to.eql('VALIDATION_ERROR'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"Test\",\n  \"recipients\": [\n    \"not-an-email\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Blank subject -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('names the subject field', () => pm.expect(JSON.stringify(pm.response.json().details)).to.include('subject'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"  \",\n  \"message\": \"Test\",\n  \"recipients\": [\n    \"john@example.com\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Blank message -> 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('names the message field', () => pm.expect(JSON.stringify(pm.response.json().details)).to.include('message'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"\",\n  \"recipients\": [\n    \"john@example.com\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Over 100 recipients -> 400",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// 101 syntactically valid addresses — the size limit fires before any DB lookup",
+                  "const recipients = Array.from({length: 101}, (_, i) => `overflow${i + 1}@load.test`);",
+                  "pm.variables.set('overflowBody', JSON.stringify({subject: 'Test', message: 'Test', recipients}));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('400 Bad Request', () => pm.expect(pm.response.code).to.eql(400));",
+                  "pm.test('reports the limit', () => pm.expect(JSON.stringify(pm.response.json().details)).to.include('must not exceed 100'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{overflowBody}}"
+            }
+          }
+        },
+        {
+          "name": "Unknown recipient -> 422, nothing persisted",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('422 Unprocessable Entity', () => pm.expect(pm.response.code).to.eql(422));",
+                  "pm.test('reports INVALID_RECIPIENTS', () => pm.expect(b.error).to.eql('INVALID_RECIPIENTS'));",
+                  "pm.test('lists the unknown address', () => pm.expect(b.unknown).to.include('ghost@example.com'));",
+                  "pm.test('no campaign was created', () => pm.expect(b.campaignId).to.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"Test\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"ghost@example.com\"\n  ]\n}"
+            },
+            "description": "All-or-nothing: the valid recipient is rejected together with the unknown one."
+          }
+        },
+        {
+          "name": "Inactive recipient -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('422 Unprocessable Entity', () => pm.expect(pm.response.code).to.eql(422));",
+                  "pm.test('lists the inactive address', () => pm.expect(b.inactive).to.include('inactive@example.com'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"Test\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"inactive@example.com\"\n  ]\n}"
+            }
+          }
+        },
+        {
+          "name": "Unknown + inactive together -> 422 lists both groups",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('422 Unprocessable Entity', () => pm.expect(pm.response.code).to.eql(422));",
+                  "pm.test('lists unknown recipients', () => pm.expect(b.unknown).to.include('ghost@example.com'));",
+                  "pm.test('lists ALL inactive recipients', () => pm.expect(b.inactive).to.have.members(['inactive@example.com', 'user97@example.com']));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Test\",\n  \"message\": \"Test\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"ghost@example.com\",\n    \"inactive@example.com\",\n    \"user97@example.com\"\n  ]\n}"
+            },
+            "description": "One response names every problem, so the caller can fix the request in a single round-trip."
+          }
+        },
+        {
+          "name": "Bulk campaign with unregistered recipients -> 422",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('422 Unprocessable Entity', () => pm.expect(pm.response.code).to.eql(422));",
+                  "pm.test('reports INVALID_RECIPIENTS', () => pm.expect(b.error).to.eql('INVALID_RECIPIENTS'));",
+                  "pm.test('lists every unregistered address', () => pm.expect(b.unknown).to.have.members(['ghost@example.com', 'nobody@example.com', 'unregistered@example.com']));",
+                  "pm.test('no campaign is created', () => pm.expect(b.campaignId).to.be.undefined);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Planned maintenance\",\n  \"message\": \"The service will be temporarily unavailable.\",\n  \"recipients\": [\n    \"john@example.com\",\n    \"jane@example.com\",\n    \"alice@example.com\",\n    \"bob@example.com\",\n    \"carol@example.com\",\n    \"temp-fail@example.com\",\n    \"bounce@example.com\",\n    \"slow@example.com\",\n    \"user10@example.com\",\n    \"user11@example.com\",\n    \"user12@example.com\",\n    \"user13@example.com\",\n    \"user14@example.com\",\n    \"user15@example.com\",\n    \"user16@example.com\",\n    \"user17@example.com\",\n    \"user18@example.com\",\n    \"user19@example.com\",\n    \"user20@example.com\",\n    \"user21@example.com\",\n    \"user22@example.com\",\n    \"user23@example.com\",\n    \"user24@example.com\",\n    \"user25@example.com\",\n    \"user26@example.com\",\n    \"user27@example.com\",\n    \"user28@example.com\",\n    \"user29@example.com\",\n    \"user30@example.com\",\n    \"user31@example.com\",\n    \"user32@example.com\",\n    \"user33@example.com\",\n    \"user34@example.com\",\n    \"user35@example.com\",\n    \"user36@example.com\",\n    \"user37@example.com\",\n    \"user38@example.com\",\n    \"user39@example.com\",\n    \"user40@example.com\",\n    \"user41@example.com\",\n    \"user42@example.com\",\n    \"user43@example.com\",\n    \"user44@example.com\",\n    \"user45@example.com\",\n    \"user46@example.com\",\n    \"user47@example.com\",\n    \"user48@example.com\",\n    \"user49@example.com\",\n    \"user50@example.com\",\n    \"user51@example.com\",\n    \"user52@example.com\",\n    \"user53@example.com\",\n    \"user54@example.com\",\n    \"user55@example.com\",\n    \"user56@example.com\",\n    \"user57@example.com\",\n    \"user58@example.com\",\n    \"user59@example.com\",\n    \"user60@example.com\",\n    \"user61@example.com\",\n    \"user62@example.com\",\n    \"user63@example.com\",\n    \"user64@example.com\",\n    \"user65@example.com\",\n    \"user66@example.com\",\n    \"user67@example.com\",\n    \"user68@example.com\",\n    \"user69@example.com\",\n    \"user70@example.com\",\n    \"user71@example.com\",\n    \"user72@example.com\",\n    \"user73@example.com\",\n    \"user74@example.com\",\n    \"user75@example.com\",\n    \"user76@example.com\",\n    \"user77@example.com\",\n    \"user78@example.com\",\n    \"user79@example.com\",\n    \"user80@example.com\",\n    \"user81@example.com\",\n    \"user82@example.com\",\n    \"user83@example.com\",\n    \"user84@example.com\",\n    \"user85@example.com\",\n    \"user86@example.com\",\n    \"user87@example.com\",\n    \"user88@example.com\",\n    \"user89@example.com\",\n    \"user90@example.com\",\n    \"user91@example.com\",\n    \"user92@example.com\",\n    \"user93@example.com\",\n    \"user94@example.com\",\n    \"user95@example.com\",\n    \"user96@example.com\",\n    \"ghost@example.com\",\n    \"nobody@example.com\",\n    \"unregistered@example.com\"\n  ]\n}"
+            },
+            "description": "95 valid + 3 unknown = 98 recipients (under the size limit, so the semantic check decides). All-or-nothing: everything is rejected, nothing stored."
+          }
+        },
+        {
+          "name": "Unknown campaign -> 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('404 Not Found', () => pm.expect(pm.response.code).to.eql(404));",
+                  "pm.test('reports CAMPAIGN_NOT_FOUND', () => pm.expect(pm.response.json().error).to.eql('CAMPAIGN_NOT_FOUND'));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/00000000-0000-0000-0000-000000000000",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "00000000-0000-0000-0000-000000000000"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Exactly-once verification",
+      "item": [
+        {
+          "name": "Duplicate addresses -> deduplicated to one recipient",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "pm.collectionVariables.set('dedupCampaignId', body.campaignId);",
+                  "pm.test('202 Accepted', () => pm.expect(pm.response.code).to.eql(202));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"Dedup scenario\",\n  \"message\": \"The same mailbox listed three times must get ONE email.\",\n  \"recipients\": [\n    \"bob@example.com\",\n    \"BOB@example.com\",\n    \"Bob@Example.com\"\n  ]\n}"
+            },
+            "description": "Case-insensitive silent deduplication: total=1, and the deliveries endpoint proves a single physical delivery."
+          }
+        },
+        {
+          "name": "Duplicate addresses -> total=1, delivered once",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('one recipient row', () => pm.expect(b.recipients.length).to.eql(1));",
+                  "const r = b.recipients[0];",
+                  "if (r.status === 'SENT') {",
+                  "    pm.test('delivered exactly once', () => pm.expect(r.delivered).to.eql(1));",
+                  "    pm.test('no suppressed duplicates needed', () => pm.expect(r.duplicatesSuppressed).to.eql(0));",
+                  "} else { console.log('still processing — send again in a moment'); }"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{dedupCampaignId}}/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{dedupCampaignId}}",
+                "deliveries"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Bulk campaign -> nobody delivered more than once",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const b = pm.response.json();",
+                  "pm.test('200 OK', () => pm.expect(pm.response.code).to.eql(200));",
+                  "pm.test('no recipient delivered more than once', () =>",
+                  "    b.recipients.forEach(r => pm.expect(r.delivered, r.email).to.be.at.most(1)));",
+                  "pm.test('every SENT recipient delivered exactly once', () =>",
+                  "    b.recipients.filter(r => r.status === 'SENT').forEach(r => pm.expect(r.delivered, r.email).to.eql(1)));",
+                  "const retried = b.recipients.filter(r => r.providerCalls > 1);",
+                  "console.log(`retried recipients: ${retried.map(r => `${r.email} (${r.providerCalls} calls, ${r.delivered} delivered)`).join(', ') || 'none yet'}`);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/api/campaigns/{{campaignId}}/deliveries",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "campaigns",
+                "{{campaignId}}",
+                "deliveries"
+              ]
+            },
+            "description": "THE acceptance criterion: run against the folder-1 campaign (any campaign id in {{campaignId}}). Even recipients the application retried several times show delivered=1 — internal retries never re-send an already delivered notification."
+          }
+        }
+      ]
+    }
+  ]
+}
