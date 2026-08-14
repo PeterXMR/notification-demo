@@ -1,5 +1,7 @@
 # Bulk e-mail notification campaigns
 
+[![CI](https://github.com/PeterXMR/notification-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/PeterXMR/notification-demo/actions/workflows/ci.yml)
+
 Backendová aplikácia na hromadné odosielanie e-mailových notifikácií registrovaným
 používateľom. Odosielanie prebieha asynchrónne: klient dostane `campaignId` okamžite
 a stav kampane priebežne zisťuje cez stavové API.
