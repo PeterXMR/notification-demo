@@ -1,18 +1,15 @@
 package com.example.notification;
 
 import com.example.notification.api.dto.CreateCampaignRequest;
-import org.junit.jupiter.api.MethodOrderer;
-import org.junit.jupiter.api.Order;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestMethodOrder;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.PostgreSQLContainer;
 
 import java.util.List;
@@ -26,32 +23,29 @@ import static org.assertj.core.api.Assertions.assertThat;
  *
  * Uses its OWN Postgres container (not the shared one from {@link IntegrationTestBase})
  * because the container is stopped mid-test, which would break every other test class.
+ * The class is single-shot: the container cannot be restarted for further test methods.
+ * {@code @DirtiesContext} closes the context afterwards so its scheduled pollers don't
+ * keep hammering the dead datasource for the rest of the suite.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        // Fail fast instead of waiting Hikari's default 30s for a connection.
+        properties = "spring.datasource.hikari.connection-timeout=1000")
 @ActiveProfiles("test")
-@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DatabaseOutageIntegrationTest {
 
+    @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16-alpine");
 
     static {
         POSTGRES.start();
     }
 
-    @DynamicPropertySource
-    static void datasource(DynamicPropertyRegistry registry) {
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", POSTGRES::getUsername);
-        registry.add("spring.datasource.password", POSTGRES::getPassword);
-        // Fail fast instead of waiting Hikari's default 30s for a connection.
-        registry.add("spring.datasource.hikari.connection-timeout", () -> "1000");
-    }
-
     @Autowired
     TestRestTemplate rest;
 
     @Test
-    @Order(1)
     void endpointsReturn503WhenDatabaseIsDown() {
         // sanity: app is up and serving while the DB is alive
         ResponseEntity<String> healthy = rest.getForEntity("/api/campaigns/" + UUID.randomUUID(), String.class);

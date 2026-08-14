@@ -120,6 +120,24 @@ cez API overiteľný dôkaz kritéria „interné opakovanie nespôsobí opakova
 Delivery log je in-memory súčasť simulátora (modeluje idempotenčné okno providera),
 nie perzistentný aplikačný stav.
 
+### Výpadok databázy (všetky endpointy)
+
+Ak je databáza nedostupná, každý endpoint vracia `503 Service Unavailable` so
+stabilným strojovo čitateľným telom — bez detailov drivera či stack trace:
+
+```json
+{
+  "error": "SERVICE_UNAVAILABLE",
+  "message": "The service is temporarily unable to process requests. Please retry later."
+}
+```
+
+Ide o dočasný výpadok infraštruktúry, nie chybu aplikácie: `503` hovorí klientom,
+load balancerom a retry middleware, aby požiadavku zopakovali neskôr, a zodpovedá
+tomu, čo v tomto stave hlási aj `/actuator/health` (`DOWN` → 503). Pokrýva aj
+zlyhanie spojenia počas commitu; commit odmietnutý z iného dôvodu než výpadku
+spojenia zostáva `500` (nebolo by pravda „skúste znova").
+
 ## Dátový model
 
 ```
