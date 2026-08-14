@@ -111,17 +111,47 @@ public interface CampaignRecipientRepository extends JpaRepository<CampaignRecip
 
     /**
      * Crash recovery: SENDING rows untouched for longer than the stuck timeout belong to
-     * a worker that died mid-send. Returning them to PENDING puts them back into circulation.
+     * a worker that died mid-send (or walked away from a DB failure). Returning them to
+     * PENDING puts them back into circulation — with a backoff, so a recipient whose
+     * result repeatedly cannot be recorded recirculates at backoff pace, not poller pace.
+     * Only rows with retry budget left are reset; exhausted ones are terminally failed
+     * by {@link #failStuckExhausted} so the claim/reset cycle cannot loop forever.
      */
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query("""
             UPDATE CampaignRecipient r
             SET r.status = com.example.notification.domain.RecipientStatus.PENDING,
+                r.nextAttemptAt = :nextAttemptAt,
                 r.updatedAt = :now
             WHERE r.status = com.example.notification.domain.RecipientStatus.SENDING
               AND r.updatedAt < :stuckBefore
+              AND r.attempts < :maxAttempts
             """)
-    int resetStuckSending(@Param("stuckBefore") Instant stuckBefore, @Param("now") Instant now);
+    int resetStuckSending(@Param("stuckBefore") Instant stuckBefore,
+                          @Param("nextAttemptAt") Instant nextAttemptAt,
+                          @Param("maxAttempts") int maxAttempts,
+                          @Param("now") Instant now);
+
+    /**
+     * The terminal bound for stuck-claim recovery: a SENDING row whose retry budget is
+     * already spent has claimed {@code maxAttempts} times without ever recording a result
+     * — repeated crashes or DB failures mid-episode. Without this transition such a row
+     * would loop claim -> stuck -> reset forever and its campaign would never complete.
+     */
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("""
+            UPDATE CampaignRecipient r
+            SET r.status = com.example.notification.domain.RecipientStatus.FAILED,
+                r.lastError = :error,
+                r.updatedAt = :now
+            WHERE r.status = com.example.notification.domain.RecipientStatus.SENDING
+              AND r.updatedAt < :stuckBefore
+              AND r.attempts >= :maxAttempts
+            """)
+    int failStuckExhausted(@Param("stuckBefore") Instant stuckBefore,
+                           @Param("maxAttempts") int maxAttempts,
+                           @Param("error") String error,
+                           @Param("now") Instant now);
 
     @Query("""
             SELECT r.id

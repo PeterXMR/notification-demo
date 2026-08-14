@@ -77,10 +77,21 @@ public class RecipientStateService {
         return repository.releaseClaim(recipientId, fenceAttempts, nextAttemptAt, truncate(error), Instant.now()) == 1;
     }
 
-    /** Crash recovery: orphaned SENDING rows (worker died mid-send) go back to PENDING. */
+    /**
+     * Crash recovery: orphaned SENDING rows (worker died mid-send, or walked away from a
+     * DB failure) go back to PENDING with a backoff — provided they still have retry
+     * budget. Exhausted rows are terminally FAILED instead (see {@link #failStuckExhausted}).
+     */
     @Transactional
-    public int resetStuckSending(Instant stuckBefore) {
-        return repository.resetStuckSending(stuckBefore, Instant.now());
+    public int resetStuckSending(Instant stuckBefore, Instant nextAttemptAt, int maxAttempts) {
+        return repository.resetStuckSending(stuckBefore, nextAttemptAt, maxAttempts, Instant.now());
+    }
+
+    /** Terminal bound for stuck-claim recovery: budget spent without a recorded result -> FAILED. */
+    @Transactional
+    public int failStuckExhausted(Instant stuckBefore, int maxAttempts) {
+        return repository.failStuckExhausted(stuckBefore, maxAttempts,
+                "retries exhausted: claim expired repeatedly without a recorded result", Instant.now());
     }
 
     private String truncate(String error) {

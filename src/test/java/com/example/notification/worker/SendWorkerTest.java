@@ -24,10 +24,12 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 /**
- * A database failure while RECORDING a result is an infrastructure fault, not a mail
- * failure: it must not burn the recipient's retry budget, and above all must never mark
- * a recipient FAILED after the provider already delivered the mail. The worker records
- * nothing and leaves the claim to the poller's stuck-SENDING recovery.
+ * A database failure while claiming or RECORDING a result is an infrastructure fault,
+ * not a mail failure: the worker must not misclassify it via the transient-mail path
+ * (which would mark a possibly-delivered recipient FAILED at max attempts). It records
+ * nothing and leaves the claim to the poller's stuck-SENDING recovery, which enforces
+ * backoff and the terminal max-attempts bound. The claim's attempt stays spent — that
+ * is deliberate: it keeps repeated unrecordable episodes bounded, like crash recovery.
  */
 class SendWorkerTest {
 
@@ -63,7 +65,7 @@ class SendWorkerTest {
     }
 
     @Test
-    void dbOutageAfterDeliveredSendDoesNotBurnRetryBudget() {
+    void dbOutageAfterDeliveredSendRecordsNothing() {
         claimed(1);
         when(stateService.markSent(id, 1)).thenThrow(
                 new DataAccessResourceFailureException("An I/O error occurred while sending to the backend"));
@@ -74,6 +76,32 @@ class SendWorkerTest {
         verify(stateService, never()).markRetry(any(), anyInt(), any(), anyString());
         verify(stateService, never()).markFailed(any(), anyInt(), anyString());
         verify(stateService, never()).release(any(), anyInt(), any(), anyString());
+    }
+
+    @Test
+    void dbOutageWhileRecordingTransientMailFailureDoesNotPropagate() {
+        // the DB can also die while a MAIL failure is being recorded (markRetry inside
+        // the transient arm) — that must be swallowed by the same walk-away path, not
+        // escape onto the executor thread
+        claimed(1);
+        doThrow(new TransientMailException("mailbox busy"))
+                .when(mailSender).send(id, "user1@example.com", "Subject", "Message");
+        when(stateService.markRetry(any(), anyInt(), any(), anyString())).thenThrow(
+                new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"));
+
+        assertThatCode(() -> worker.process(id)).doesNotThrowAnyException();
+
+        verify(stateService, never()).markFailed(any(), anyInt(), anyString());
+    }
+
+    @Test
+    void dbOutageDuringClaimDoesNotPropagate() {
+        when(stateService.claim(id)).thenThrow(
+                new CannotCreateTransactionException("Could not open JPA EntityManager for transaction"));
+
+        assertThatCode(() -> worker.process(id)).doesNotThrowAnyException();
+
+        verify(mailSender, never()).send(any(), anyString(), anyString(), anyString());
     }
 
     @Test

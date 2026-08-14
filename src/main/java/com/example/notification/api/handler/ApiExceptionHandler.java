@@ -97,7 +97,8 @@ public class ApiExceptionHandler {
      * and Hibernate classifies connection problems as {@link JDBCConnectionException}.
      */
     private static boolean hasConnectionFailureCause(Throwable t) {
-        for (Throwable cause = t; cause != null; cause = cause.getCause()) {
+        int depth = 0;
+        for (Throwable cause = t; cause != null && depth++ < 50; cause = cause.getCause()) {
             if (cause instanceof ConnectException
                     || cause instanceof SQLRecoverableException
                     || cause instanceof SQLTransientConnectionException
